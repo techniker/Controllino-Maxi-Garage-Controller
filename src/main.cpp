@@ -65,17 +65,40 @@ void setup() {
 }
 
 void controlDoor(const String& action) {
-  if (action == "open") {
-    // Logic to open the door
-    // ...
-  } else if (action == "close") {
-    // Logic to close the door
-    // ...
+  unsigned long currentTime = millis();
+
+  if (action == "open" && doorState != 1) {
+    // Open the door only if it's not already opening
+    doorState = 1; // Set state to opening
+    doorStartTime = currentTime;
+    doorMoving = true;
+    statusLightOn = true;
+    digitalWrite(doorDirectionPin, HIGH); // Set direction to up
+    delay(300); // Wait before enabling the power pin
+    digitalWrite(doorPowerPin, HIGH); // Turn on door power
+  } else if (action == "close" && doorState != 2) {
+    // Close the door only if it's not already closing
+    doorState = 2; // Set state to closing
+    doorStartTime = currentTime;
+    doorMoving = true;
+    statusLightOn = true;
+    digitalWrite(doorDirectionPin, LOW); // Set direction to down
+    delay(300); // Wait before enabling the power pin
+    digitalWrite(doorPowerPin, HIGH); // Turn on door power
   } else if (action == "stop") {
-    // Logic to stop the door
-    // ...
+    // Stop the door if it's moving
+    if (doorMoving) {
+      doorState = 0; // Set state to idle
+      doorMoving = false;
+      statusLightOn = false;
+      digitalWrite(doorPowerPin, LOW); // Turn off door power
+    }
   }
+
+  // Update the time of the last door state change
+  lastDoorStateChangeTime = currentTime;
 }
+
 
 void loop() {
   // Update the button state through debouncer
