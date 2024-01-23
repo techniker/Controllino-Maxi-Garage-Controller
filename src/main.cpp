@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <Controllino.h>
 #include <Bounce2.h> // Include the Bounce2 library
+#include <Ethernet.h>
+#include <SPI.h>
 
 // Garage door controller pins
 const int buttonPin = CONTROLLINO_A9;        // Pin for the button
@@ -35,6 +37,11 @@ int lastEndSwitchState = HIGH;
 unsigned long endSwitchTriggerTime = 0;
 unsigned long lastDoorStateChangeTime = 0; // Track the time when the door state was last changed
 
+// Network settings for Ethernet
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+IPAddress ip('10.22.5.30');
+EthernetServer server(80);
+
 void setup() {
   pinMode(buttonPin, INPUT);
   pinMode(doorPowerPin, OUTPUT);
@@ -51,7 +58,47 @@ void setup() {
   Serial.begin(115200);
   Serial.print("GarageControl v1.0");
   Serial.print(endSwitchState);
+
+  // Start the Ethernet connection and the server
+  Ethernet.begin(mac, ip);
+  server.begin();
 }
+
+void controlDoor(const String& action) {
+  unsigned long currentTime = millis();
+
+  if (action == "open" && doorState != 1) {
+    // Open the door only if it's not already opening
+    doorState = 1; // Set state to opening
+    doorStartTime = currentTime;
+    doorMoving = true;
+    statusLightOn = true;
+    digitalWrite(doorDirectionPin, HIGH); // Set direction to up
+    delay(300); // Wait before enabling the power pin
+    digitalWrite(doorPowerPin, HIGH); // Turn on door power
+  } else if (action == "close" && doorState != 2) {
+    // Close the door only if it's not already closing
+    doorState = 2; // Set state to closing
+    doorStartTime = currentTime;
+    doorMoving = true;
+    statusLightOn = true;
+    digitalWrite(doorDirectionPin, LOW); // Set direction to down
+    delay(300); // Wait before enabling the power pin
+    digitalWrite(doorPowerPin, HIGH); // Turn on door power
+  } else if (action == "stop") {
+    // Stop the door if it's moving
+    if (doorMoving) {
+      doorState = 0; // Set state to idle
+      doorMoving = false;
+      statusLightOn = false;
+      digitalWrite(doorPowerPin, LOW); // Turn off door power
+    }
+  }
+
+  // Update the time of the last door state change
+  lastDoorStateChangeTime = currentTime;
+}
+
 
 void loop() {
   // Update the button state through debouncer
@@ -143,6 +190,46 @@ void loop() {
   // Update the last end switch state
   lastEndSwitchState = endSwitchState;
 
+// Web server handling
+  EthernetClient client = server.available();
+  if (client) {
+    boolean currentLineIsBlank = true;
+    String request = "";
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        request += c;
+        if (c == '\n' && currentLineIsBlank) {
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println();
+          client.println("<!DOCTYPE html><html>");
+          client.println("<head><title>Garage Door Controller</title></head>");
+          client.println("<body><h1>Garage Door Controller</h1>");
+          client.println("<button onclick=\"location.href='/open'\">Open</button>");
+          client.println("<button onclick=\"location.href='/close'\">Close</button>");
+          client.println("<button onclick=\"location.href='/stop'\">Stop</button>");
+          client.println("</body></html>");
+          break;
+        }
+        if (c == '\n') {
+          currentLineIsBlank = true;
+        } else if (c != '\r') {
+          currentLineIsBlank = false;
+        }
+      }
+    }
+    client.stop();
+
+    if (request.indexOf("/open") > 0) {
+      controlDoor("open");
+    } else if (request.indexOf("/close") > 0) {
+      controlDoor("close");
+    } else if (request.indexOf("/stop") > 0) {
+      controlDoor("stop");
+    }
+  }
   // Update the last button state
   lastButtonState = buttonState;
 }
