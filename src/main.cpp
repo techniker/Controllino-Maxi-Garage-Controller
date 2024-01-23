@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <Controllino.h>
 #include <Bounce2.h> // Include the Bounce2 library
+#include <Ethernet.h>
+#include <SPI.h>
 
 // Garage door controller pins
 const int buttonPin = CONTROLLINO_A9;        // Pin for the button
@@ -35,6 +37,11 @@ int lastEndSwitchState = HIGH;
 unsigned long endSwitchTriggerTime = 0;
 unsigned long lastDoorStateChangeTime = 0; // Track the time when the door state was last changed
 
+// Network settings for Ethernet
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+IPAddress ip('10.22.5.30');
+EthernetServer server(80);
+
 void setup() {
   pinMode(buttonPin, INPUT);
   pinMode(doorPowerPin, OUTPUT);
@@ -51,6 +58,23 @@ void setup() {
   Serial.begin(115200);
   Serial.print("GarageControl v1.0");
   Serial.print(endSwitchState);
+
+  // Start the Ethernet connection and the server
+  Ethernet.begin(mac, ip);
+  server.begin();
+}
+
+void controlDoor(const String& action) {
+  if (action == "open") {
+    // Logic to open the door
+    // ...
+  } else if (action == "close") {
+    // Logic to close the door
+    // ...
+  } else if (action == "stop") {
+    // Logic to stop the door
+    // ...
+  }
 }
 
 void loop() {
@@ -143,6 +167,46 @@ void loop() {
   // Update the last end switch state
   lastEndSwitchState = endSwitchState;
 
+// Web server handling
+  EthernetClient client = server.available();
+  if (client) {
+    boolean currentLineIsBlank = true;
+    String request = "";
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        request += c;
+        if (c == '\n' && currentLineIsBlank) {
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println();
+          client.println("<!DOCTYPE html><html>");
+          client.println("<head><title>Garage Door Controller</title></head>");
+          client.println("<body><h1>Garage Door Controller</h1>");
+          client.println("<button onclick=\"location.href='/open'\">Open</button>");
+          client.println("<button onclick=\"location.href='/close'\">Close</button>");
+          client.println("<button onclick=\"location.href='/stop'\">Stop</button>");
+          client.println("</body></html>");
+          break;
+        }
+        if (c == '\n') {
+          currentLineIsBlank = true;
+        } else if (c != '\r') {
+          currentLineIsBlank = false;
+        }
+      }
+    }
+    client.stop();
+
+    if (request.indexOf("/open") > 0) {
+      controlDoor("open");
+    } else if (request.indexOf("/close") > 0) {
+      controlDoor("close");
+    } else if (request.indexOf("/stop") > 0) {
+      controlDoor("stop");
+    }
+  }
   // Update the last button state
   lastButtonState = buttonState;
 }
