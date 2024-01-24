@@ -38,8 +38,11 @@ unsigned long endSwitchTriggerTime = 0;
 unsigned long lastDoorStateChangeTime = 0; // Track the time when the door state was last changed
 
 // Network settings for Ethernet
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress ip('10.22.5.30');
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFF, 0xED };
+IPAddress ip(10, 100, 0, 55);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress gateway(10, 100, 0, 1); 
+IPAddress dns(10, 100, 0, 1);
 EthernetServer server(80);
 
 void setup() {
@@ -60,7 +63,7 @@ void setup() {
   Serial.print(endSwitchState);
 
   // Start the Ethernet connection and the server
-  Ethernet.begin(mac, ip);
+  Ethernet.begin(mac, ip, dns, gateway, subnet);
   server.begin();
 }
 
