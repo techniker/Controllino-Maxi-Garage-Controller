@@ -14,7 +14,6 @@ const int statusLightPin = CONTROLLINO_D11;   // Pin for the status light
 const int statusLightPinLocked = CONTROLLINO_D10;   // Pin for status light1
 const int endSwitchPin = CONTROLLINO_A8; // Pin for the end switch
 const int endSwitchPowerOffDelay = 100; // Delay before turning off power pin when end switch is triggered (milliseconds)
-
 const int doorMovementTime = 30000; // 60 seconds in milliseconds
 const int blinkInterval = 300;      // Status light blink interval in milliseconds
 const int debounceInterval = 50;   // Debounce interval in milliseconds
@@ -101,7 +100,6 @@ void controlDoor(const String& action) {
   // Update the time of the last door state change
   lastDoorStateChangeTime = currentTime;
 }
-
 
 void loop() {
   // Update the button state through debouncer
@@ -203,17 +201,36 @@ void loop() {
         char c = client.read();
         request += c;
         if (c == '\n' && currentLineIsBlank) {
-          client.println("HTTP/1.1 200 OK");
-          client.println("Content-Type: text/html");
-          client.println("Connection: close");
-          client.println();
-          client.println("<!DOCTYPE html><html>");
-          client.println("<head><title>Garage Door Controller</title></head>");
-          client.println("<body><h1>Garage Door Controller</h1>");
-          client.println("<button onclick=\"location.href='/open'\">Open</button>");
-          client.println("<button onclick=\"location.href='/close'\">Close</button>");
-          client.println("<button onclick=\"location.href='/stop'\">Stop</button>");
-          client.println("</body></html>");
+        client.println("HTTP/1.1 200 OK");
+        client.println("Content-Type: text/html");
+        client.println("Connection: close");
+        client.println();
+        client.println("<!DOCTYPE html><html>");
+        client.println("<head><title>Garage Door Controller</title>");
+        client.println("<style>");
+        client.println("  body { background-color: #333; color: white; font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; flex-direction: column; height: 100vh; }");
+        client.println("  h1 { text-align: center; margin-bottom: 20px; }");
+        client.println("  .container { text-align: center; width: 100%; }");
+        client.println("  button { background-color: #555; color: white; border: none; padding: 20px 40px; text-align: center; text-decoration: none; font-size: 20px; margin: 10px; cursor: pointer; border-radius: 12px; width: 80%; max-width: 300px; }"); // Larger buttons
+        client.println("  .led { height: 24px; width: 24px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-bottom: 20px; }");
+        client.println("  .led.on { background-color: #0f0; }"); // Green when on
+        client.println("</style>");
+        client.println("</head>");
+        client.println("<body>");
+        client.println("<div class='container'>");
+        client.println("<h1>Garage Door Controller</h1>");
+        client.println("<div class='led' id='ledIndicator'></div>"); // LED indicator
+
+        // Dynamically set the class of the LED indicator
+        client.print("<script>document.getElementById('ledIndicator').className = '");
+        client.print(statusLightOn ? "led on" : "led");
+        client.println("';</script>");
+
+        client.println("<button onclick=\"location.href='/open'\">Open</button>");
+        client.println("<button onclick=\"location.href='/close'\">Close</button>");
+        client.println("<button onclick=\"location.href='/stop'\">Stop</button>");
+        client.println("</div>");
+        client.println("</body></html>");
           break;
         }
         if (c == '\n') {
