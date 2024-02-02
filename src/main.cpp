@@ -1,10 +1,12 @@
 // GarageController
 // <tec ( att ) sixtopia.net>
-#include <Arduino.h>
-#include <Controllino.h>
+
+
+#include <Arduino.h> //Include the Arduino Library
+#include <Controllino.h> //Include the Controllino Library
 #include <Bounce2.h> // Include the Bounce2 library
-#include <Ethernet.h>
-#include <SPI.h>
+#include <Ethernet.h> //Include the ENC28J60 Eth Library
+#include <SPI.h> //Include the SPI Library
 
 // Garage door controller pins
 const int buttonPin = CONTROLLINO_A9;        // Pin for the button
@@ -35,6 +37,7 @@ int endSwitchState = LOW; // The end switch is initially in the fully closed sta
 int lastEndSwitchState = HIGH;
 unsigned long endSwitchTriggerTime = 0;
 unsigned long lastDoorStateChangeTime = 0; // Track the time when the door state was last changed
+bool isDoorFullyClosed = false; // Track if door is fully closed by endswitch state
 
 // Network settings for Ethernet
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFF, 0xED };
@@ -143,6 +146,21 @@ void loop() {
     }
   }
 
+  endSwitchState = digitalRead(endSwitchPin); // Read the current state of the end switch
+  isDoorFullyClosed = (endSwitchState == LOW); // Update based on your switch configuration
+
+  /*
+  // Check if the door is moving down and the end switch is triggered
+  if (doorState == 2 && endSwitchState == LOW) {
+    // End switch is triggered, indicating the door is fully closed
+    doorMoving = false; // Stop the door movement
+    doorState = 0; // Set door state to idle
+    statusLightOn = false;
+    digitalWrite(doorPowerPin, LOW); // Turn off door power
+    digitalWrite(statusLightPin, HIGH); // Optionally, turn on status light to indicate door is fully closed
+  }
+  */
+
   // Control door movement
   if (doorMoving) {
     unsigned long currentTime = millis();
@@ -193,63 +211,74 @@ void loop() {
 
 // Web server handling
   EthernetClient client = server.available();
-  if (client) {
-    boolean currentLineIsBlank = true;
-    String request = "";
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        request += c;
-        if (c == '\n' && currentLineIsBlank) {
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-Type: text/html");
-        client.println("Connection: close");
-        client.println();
-        client.println("<!DOCTYPE html><html>");
-        client.println("<head><title>Garage Door Controller</title>");
-        client.println("<style>");
-        client.println("  body { background-color: #333; color: white; font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; flex-direction: column; height: 100vh; }");
-        client.println("  h1 { text-align: center; margin-bottom: 20px; }");
-        client.println("  .container { text-align: center; width: 100%; }");
-        client.println("  button { background-color: #555; color: white; border: none; padding: 20px 40px; text-align: center; text-decoration: none; font-size: 20px; margin: 10px; cursor: pointer; border-radius: 12px; width: 80%; max-width: 300px; }"); // Larger buttons
-        client.println("  .led { height: 24px; width: 24px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-bottom: 20px; }");
-        client.println("  .led.on { background-color: #0f0; }"); // Green when on
-        client.println("</style>");
-        client.println("</head>");
-        client.println("<body>");
-        client.println("<div class='container'>");
-        client.println("<h1>Garage Door Controller</h1>");
-        client.println("<div class='led' id='ledIndicator'></div>"); // LED indicator
+if (client) { // If a new client connects,
+  String currentLine = ""; // Make a String to hold incoming data from the client
+  while (client.connected()) { // Loop while the client's connected
+    if (client.available()) { // If there's bytes to read from the client,
+      char c = client.read(); // Read a byte, then
+      if (c == '\n') { // If the byte is a newline character
 
-        // Dynamically set the class of the LED indicator
-        client.print("<script>document.getElementById('ledIndicator').className = '");
-        client.print(statusLightOn ? "led on" : "led");
-        client.println("';</script>");
+        // If the current line is blank, you got two newline characters in a row.
+        // That's the end of the client HTTP request, so send a response:
+        if (currentLine.length() == 0) {
+          // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+          // and a content-type so the client knows what's coming, then a blank line:
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connection: close");
+          client.println();
+          client.println("<!DOCTYPE html><html>");
+          client.println("<head><title>Garage Door Controller</title>");
+          client.println("<style>");
+          client.println("  body { background-color: #333; color: white; font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; flex-direction: column; height: 100vh; }");
+          client.println("  h1 { text-align: center; margin-bottom: 20px; }");
+          client.println("  .container { text-align: center; width: 100%; }");
+          client.println("  button { background-color: #555; color: white; border: none; padding: 20px 40px; text-align: center; text-decoration: none; font-size: 20px; margin: 10px; cursor: pointer; border-radius: 12px; width: 80%; max-width: 300px; }"); // Larger buttons
+          client.println("  .led { height: 24px; width: 24px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-bottom: 20px; }");
+          client.println("  .led.on { background-color: #0f0; }"); // Green when on
+          client.println("</style>");
+          client.println("</head>");
+          client.println("<body>");
+          client.println("<div class='container'>");
+          client.println("<head><title>Garage Door Controller</title></head>");
+          client.println("<body>");
+          client.println("<h1>Garage Door Controller</h1>");
+          client.println("<p>Click a button to control the garage door:</p>");
+          client.println("<button onclick=\"location.href='/open'\">Open Door</button>");
+          client.println("<button onclick=\"location.href='/close'\">Close Door</button>");
+          client.println("<button onclick=\"location.href='/stop'\">Stop Door</button>");
+          client.println("<p>Door Status:</p>");
+          client.println("<div style='text-align: center;'>"); // Center-align the content of this div
+          client.print("<div style='display: inline-block; width: 30px; height: 30px; border-radius: 15px; background-color: ");
+          client.print(isDoorFullyClosed ? "#00FF00" : "#FF0000"); // Green if closed, red otherwise
+          client.println(";'></div>");
+          client.println("</div>"); // Close the centering div
 
-        client.println("<button onclick=\"location.href='/open'\">Open</button>");
-        client.println("<button onclick=\"location.href='/close'\">Close</button>");
-        client.println("<button onclick=\"location.href='/stop'\">Stop</button>");
-        client.println("</div>");
-        client.println("</body></html>");
+          // The HTTP response ends with another blank line
+          client.println();
+          // Break out of the while loop
           break;
+        } else { // If you got a newline, then clear currentLine
+          currentLine = "";
         }
-        if (c == '\n') {
-          currentLineIsBlank = true;
-        } else if (c != '\r') {
-          currentLineIsBlank = false;
-        }
+      } else if (c != '\r') { // If you got anything else but a carriage return character,
+        // Add it to the end of the currentLine
+        currentLine += c;
+      }
+
+      // Check the request route
+      if (currentLine.endsWith("GET /open")) {
+        controlDoor("open");
+      } else if (currentLine.endsWith("GET /close")) {
+        controlDoor("close");
+      } else if (currentLine.endsWith("GET /stop")) {
+        controlDoor("stop");
       }
     }
-    client.stop();
-
-    if (request.indexOf("/open") > 0) {
-      controlDoor("open");
-    } else if (request.indexOf("/close") > 0) {
-      controlDoor("close");
-    } else if (request.indexOf("/stop") > 0) {
-      controlDoor("stop");
-    }
   }
+  // Close the connection
+  client.stop();
+}
   // Update the last button state
   lastButtonState = buttonState;
 }
