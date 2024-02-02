@@ -14,7 +14,6 @@ const int statusLightPin = CONTROLLINO_D11;   // Pin for the status light
 const int statusLightPinLocked = CONTROLLINO_D10;   // Pin for status light1
 const int endSwitchPin = CONTROLLINO_A8; // Pin for the end switch
 const int endSwitchPowerOffDelay = 100; // Delay before turning off power pin when end switch is triggered (milliseconds)
-
 const int doorMovementTime = 30000; // 60 seconds in milliseconds
 const int blinkInterval = 300;      // Status light blink interval in milliseconds
 const int debounceInterval = 50;   // Debounce interval in milliseconds
